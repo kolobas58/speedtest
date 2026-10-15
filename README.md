@@ -18,7 +18,7 @@
 
 ## Выпуск новой версии
 1. Правки в `src/speedtest.pyw`, поднять `VERSION`.
-2. `git commit -am "1.2.1" && git tag v1.2.1 && git push --follow-tags`
+2. `git commit -am "1.2.1" && git push` — релиз и тег GitHub Actions создаст сам.
 3. GitHub Actions соберёт и опубликует релиз, пользователи обновятся сами.
 
 Секрет репозитория `UPDATE_SIGNING_KEY` — приватный ключ подписи (hex). Хранить только в секретах
