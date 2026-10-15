@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Сборка портативного Speedtest.exe (Windows 7 SP1 – 11, x64) на Linux.
 # Нужны: python3 + pip, nsis (makensis), unzip.   Ubuntu: sudo apt install nsis unzip
-# Результат: dist/Speedtest.exe, dist/Speedtest-Setup.exe   (+ dist/latest.json, если задан UPDATE_SIGNING_KEY)
+# Результат: dist/Speedtest-Portable.exe, dist/Speedtest-Setup.exe   (+ dist/latest.json, если задан UPDATE_SIGNING_KEY)
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 VER="$(sed -n 's/^VERSION = "\(.*\)"/\1/p' "$ROOT/src/speedtest.pyw")"
@@ -43,15 +43,15 @@ find "$Q/Qt5/plugins/imageformats" -type f ! -name qico.dll -delete
 cp "$ROOT/src/speedtest.pyw" "$ROOT/src/speedtest.ico" "$P/"
 
 # --- портативный exe ---
-makensis -V2 -DVER="$VER" -DPAYLOAD="$P" -DOUT="$OUT/Speedtest.exe" -DICON="$ROOT/src/speedtest.ico" "$ROOT/build/portable.nsi"
-echo ">> $OUT/Speedtest.exe ($(du -h "$OUT/Speedtest.exe" | cut -f1))"
+makensis -V2 -DVER="$VER" -DPAYLOAD="$P" -DOUT="$OUT/Speedtest-Portable.exe" -DICON="$ROOT/src/speedtest.ico" "$ROOT/build/portable.nsi"
+echo ">> $OUT/Speedtest-Portable.exe ($(du -h "$OUT/Speedtest-Portable.exe" | cut -f1))"
 
 # --- установщик (обёртка над тем же Speedtest.exe — автообновление общее) ---
-makensis -V2 -DVER="$VER" -DEXE="$OUT/Speedtest.exe" -DOUT="$OUT/Speedtest-Setup.exe" -DICON="$ROOT/src/speedtest.ico" "$ROOT/build/installer.nsi"
+makensis -V2 -DVER="$VER" -DEXE="$OUT/Speedtest-Portable.exe" -DOUT="$OUT/Speedtest-Setup.exe" -DICON="$ROOT/src/speedtest.ico" "$ROOT/build/installer.nsi"
 echo ">> $OUT/Speedtest-Setup.exe ($(du -h "$OUT/Speedtest-Setup.exe" | cut -f1))"
 
 # --- манифест обновления (только при наличии ключа) ---
 if [ -n "${UPDATE_SIGNING_KEY:-}" ]; then
-  python3 "$ROOT/tools/sign_release.py" "$OUT/Speedtest.exe" "$VER" > "$OUT/latest.json"
+  python3 "$ROOT/tools/sign_release.py" "$OUT/Speedtest-Portable.exe" "$VER" > "$OUT/latest.json"
   echo ">> $OUT/latest.json подписан"
 fi

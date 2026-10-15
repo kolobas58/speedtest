@@ -3,7 +3,7 @@ name: release
 # Выпуск новой версии:
 #   1) поменять VERSION в src/speedtest.pyw (например 1.2.1)
 #   2) git commit -am "1.2.1" && git tag v1.2.1 && git push --follow-tags
-# Workflow соберёт Speedtest.exe, подпишет latest.json и опубликует релиз —
+# Workflow соберёт Speedtest-Portable.exe и Speedtest-Setup.exe, подпишет latest.json и опубликует релиз —
 # все установленные копии обновятся сами при следующем запуске.
 on:
   push:
@@ -45,5 +45,5 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release create "$GITHUB_REF_NAME" dist/Speedtest.exe dist/Speedtest-Setup.exe dist/latest.json \
-            --title "Speedtest $GITHUB_REF_NAME" --notes "**Speedtest.exe** — без установки: скачал и запустил. **Speedtest-Setup.exe** — с ярлыками и записью в «Программах». Обе версии обновляются автоматически."
+          gh release create "$GITHUB_REF_NAME" dist/Speedtest-Portable.exe dist/Speedtest-Setup.exe dist/latest.json \
+            --title "Speedtest $GITHUB_REF_NAME" --notes "**Speedtest-Portable.exe** — без установки: скачал и запустил. **Speedtest-Setup.exe** — с ярлыками и записью в «Программах». Обе версии обновляются автоматически."

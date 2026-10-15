@@ -1,9 +1,9 @@
 # Speedtest by kolobas58
 
 Минималистичный замер скорости интернета для Windows 7 SP1 – 11 (x64).
-Один файл `Speedtest.exe`: скачал → запустил → через пару секунд идёт замер. Установка не нужна.
+Один файл `Speedtest-Portable.exe`: скачал → запустил → через пару секунд идёт замер. Установка не нужна.
 
-- **[Speedtest.exe](../../releases/latest/download/Speedtest.exe)** — без установки: скачал → запустил.
+- **[Speedtest-Portable.exe](../../releases/latest/download/Speedtest-Portable.exe)** — без установки: скачал → запустил.
 - **[Speedtest-Setup.exe](../../releases/latest/download/Speedtest-Setup.exe)** — тихая установка без прав администратора:
   ярлыки на рабочем столе и в «Пуске», запись в «Программах и компонентах». `/S` — тихо, `uninstall.exe /S` — тихое удаление.
 
@@ -28,5 +28,5 @@ GitHub и в надёжном месте у себя: без него выпус
 ## Локальная сборка (Linux / WSL)
 ```
 sudo apt install nsis unzip && pip install cryptography
-./build/build.sh                      # dist/Speedtest.exe
+./build/build.sh      # dist/Speedtest-Portable.exe и dist/Speedtest-Setup.exe
 ```

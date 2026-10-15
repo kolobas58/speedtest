@@ -1,7 +1,7 @@
 """Подписывает релиз: создаёт latest.json для Speedtest.exe.
 
 Использование:
-    UPDATE_SIGNING_KEY=<hex 32 байта> python tools/sign_release.py dist/Speedtest.exe 1.2.0 > dist/latest.json
+    UPDATE_SIGNING_KEY=<hex 32 байта> python tools/sign_release.py dist/Speedtest-Portable.exe 1.2.0 > dist/latest.json
     python tools/sign_release.py --keygen      # новая пара ключей (один раз)
 """
 import hashlib
