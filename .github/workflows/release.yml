@@ -1,0 +1,49 @@
+name: release
+
+# Выпуск новой версии:
+#   1) поменять VERSION в src/speedtest.pyw (например 1.2.1)
+#   2) git commit -am "1.2.1" && git tag v1.2.1 && git push --follow-tags
+# Workflow соберёт Speedtest.exe, подпишет latest.json и опубликует релиз —
+# все установленные копии обновятся сами при следующем запуске.
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Версия в теге совпадает с кодом
+        run: |
+          V=$(sed -n 's/^VERSION = "\(.*\)"/\1/p' src/speedtest.pyw)
+          [ "v$V" = "$GITHUB_REF_NAME" ] || { echo "тег $GITHUB_REF_NAME, а в коде VERSION=$V"; exit 1; }
+
+      - name: Инструменты
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq nsis unzip
+          python3 -m pip install -q cryptography
+
+      - name: Сборка и подпись
+        env:
+          UPDATE_SIGNING_KEY: ${{ secrets.UPDATE_SIGNING_KEY }}
+        run: |
+          [ -n "$UPDATE_SIGNING_KEY" ] || { echo "нет секрета UPDATE_SIGNING_KEY"; exit 1; }
+          ./build/build.sh
+          python3 - <<'PY'
+          import json, re
+          pub = re.search(r'UPDATE_PUBKEY = "([0-9a-f]{64})"', open("src/speedtest.pyw", encoding="utf-8").read()).group(1)
+          assert json.load(open("dist/latest.json"))["pub"] == pub, "ключ подписи не совпадает с UPDATE_PUBKEY в коде"
+          PY
+
+      - name: Публикация релиза
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" dist/Speedtest.exe dist/latest.json \
+            --title "Speedtest $GITHUB_REF_NAME" --notes "Автоматическая сборка. Скачайте Speedtest.exe и запустите — установка не нужна."
