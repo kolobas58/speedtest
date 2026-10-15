@@ -667,7 +667,23 @@ class Updater(QThread):
         except OSError:
             os.replace(exe, old)
             os.replace(tmp, exe)
+        _bump_installed_version(exe, ver)
         self.updated.emit(ver)
+
+
+def _bump_installed_version(exe, ver):
+    """Если это установленная копия — обновить версию в «Программах и компонентах»."""
+    if sys.platform != "win32":
+        return
+    try:
+        import winreg
+        key = r"Software\Microsoft\Windows\CurrentVersion\Uninstall\Speedtest"
+        with winreg.OpenKey(winreg.HKEY_CURRENT_USER, key, 0, winreg.KEY_READ | winreg.KEY_SET_VALUE) as k:
+            loc = winreg.QueryValueEx(k, "InstallLocation")[0]
+            if os.path.normcase(os.path.abspath(loc)) == os.path.normcase(os.path.dirname(os.path.abspath(exe))):
+                winreg.SetValueEx(k, "DisplayVersion", 0, winreg.REG_SZ, ver)
+    except OSError:
+        pass
 
 
 def fmt(v):

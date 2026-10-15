@@ -45,5 +45,5 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release create "$GITHUB_REF_NAME" dist/Speedtest.exe dist/latest.json \
-            --title "Speedtest $GITHUB_REF_NAME" --notes "Автоматическая сборка. Скачайте Speedtest.exe и запустите — установка не нужна."
+          gh release create "$GITHUB_REF_NAME" dist/Speedtest.exe dist/Speedtest-Setup.exe dist/latest.json \
+            --title "Speedtest $GITHUB_REF_NAME" --notes "**Speedtest.exe** — без установки: скачал и запустил. **Speedtest-Setup.exe** — с ярлыками и записью в «Программах». Обе версии обновляются автоматически."
