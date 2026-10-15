@@ -31,31 +31,111 @@ if sys.platform == "win32":
 
 try:
     from PyQt6.QtCore import Qt, QThread, QRectF, QTimer, pyqtSignal
-    from PyQt6.QtGui import QColor, QFont, QIcon, QPainter, QPainterPath, QPen
-    from PyQt6.QtWidgets import (QApplication, QHBoxLayout, QLabel, QPushButton,
+    from PyQt6.QtGui import (QBrush, QColor, QConicalGradient, QFont, QIcon, QPainter,
+                             QPainterPath, QPen)
+    from PyQt6.QtWidgets import (QApplication, QGridLayout, QHBoxLayout, QLabel, QPushButton,
                                  QVBoxLayout, QWidget)
     QT6 = True
 except ImportError:  # Windows 7/8 — PyQt5
     from PyQt5.QtCore import Qt, QThread, QRectF, QTimer, pyqtSignal
-    from PyQt5.QtGui import QColor, QFont, QIcon, QPainter, QPainterPath, QPen
-    from PyQt5.QtWidgets import (QApplication, QHBoxLayout, QLabel, QPushButton,
+    from PyQt5.QtGui import (QBrush, QColor, QConicalGradient, QFont, QIcon, QPainter,
+                             QPainterPath, QPen)
+    from PyQt5.QtWidgets import (QApplication, QGridLayout, QHBoxLayout, QLabel, QPushButton,
                                  QVBoxLayout, QWidget)
     QT6 = False
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 
-ACCENT = "#4f8cff"
-ACCENT2 = "#a77bff"
-BG = "#0f1115"
-BORDER = "#1f2430"
-TRACK = "#232835"
-FG = "#e8eaf0"
-DIM = "#7a8194"
-TRACK_TXT = "#4a5163"
+# ---------- темы оформления ----------
+# ACCENT — загрузка и кнопка, ACCENT2 — отдача, ACCENT_HI — кнопка под курсором
+# Палитра стихий/рас: загрузка — цвет темы, отдача — соседний цвет радуги
+RAINBOW = ["#FF2E2E", "#FF7A1A", "#FFE619", "#22C55E", "#2F7BF6", "#9D4EDD"]
+#          ключ      название    раса              основной     фон тёмной (BG, BORDER, TRACK, FG, DIM, TRACK_TXT)                    фон светлой
+_PALETTE = [
+    ("fire",    "Огонь",   "Люди",           "#FF2E2E", ("#140d0d", "#2a1a1a", "#2c1d1d", "#f2e8e8", "#9a8484", "#5e4a4a"),
+                                                        ("#fbf4f4", "#efd9d9", "#f2e1e1", "#2a1414", "#8a6c6c", "#bba0a0")),
+    ("earth",   "Земля",   "Орки",           "#FF7A1A", ("#14100c", "#2a2018", "#2d231b", "#f2ebe4", "#9a8a7c", "#5e5043"),
+                                                        ("#fbf6f1", "#eee0d2", "#f1e6db", "#2a1d12", "#8a7462", "#bba693")),
+    ("light",   "Свет",    "Гномы",          "#FFE619", ("#13120b", "#29271a", "#2b291c", "#f3f1e3", "#9a9680", "#5d5a45"),
+                                                        ("#fbfaf0", "#ece8cf", "#f0edd9", "#26230f", "#807b5c", "#b2ad8c")),
+    ("wind",    "Ветер",   "Тёмные эльфы",   "#22C55E", ("#0c1410", "#1a2720", "#1d2b24", "#e5f0ea", "#7b9086", "#485b51"),
+                                                        ("#f2f8f4", "#d6e7dd", "#deece4", "#12221a", "#5f7a6c", "#9ab0a4")),
+    ("water",   "Вода",    "Светлые эльфы",  "#2F7BF6", ("#0c0f16", "#1a2030", "#1d2435", "#e6ebf4", "#7c8599", "#49516a"),
+                                                        ("#f3f6fc", "#d9e1f0", "#e1e8f4", "#141c2c", "#64708a", "#a0aac0")),
+    ("dark",    "Тьма",    "Камаэли",        "#9D4EDD", ("#110d17", "#241c32", "#271e37", "#eee8f6", "#8d82a2", "#574c6c"),
+                                                        ("#f7f3fc", "#e3d9f0", "#e9e1f4", "#1f1530", "#776a90", "#ada2c2")),
+    ("rainbow", "Радуга",  "все расы",       None,      ("#0f0f12", "#222228", "#26262d", "#ececf0", "#85858f", "#50505a"),
+                                                        ("#f6f6f8", "#e0e0e6", "#e7e7ec", "#1b1b22", "#6c6c78", "#a5a5b0")),
+]
+
+
+def _rgb(h):
+    h = h.lstrip("#")
+    return tuple(int(h[i:i + 2], 16) for i in (0, 2, 4))
+
+
+def _hex(c):
+    return "#%02x%02x%02x" % tuple(max(0, min(255, round(x))) for x in c)
+
+
+def _mix(a, b, t):
+    """a → b на долю t."""
+    ra, rb = _rgb(a), _rgb(b)
+    return _hex(ra[i] + (rb[i] - ra[i]) * t for i in range(3))
+
+
+def _btn_txt(c):
+    r, g, b = _rgb(c)
+    return "#111114" if 0.299 * r + 0.587 * g + 0.114 * b > 150 else "#ffffff"
+
+
+def _grad_css(lighten=0.0):
+    stops = ", ".join(f"stop:{i / (len(RAINBOW) - 1):.2f} {_mix(c, '#ffffff', lighten)}" for i, c in enumerate(RAINBOW))
+    return f"qlineargradient(x1:0, y1:0, x2:1, y2:0, {stops})"
+
+
+def _make_theme(key, name, race, main, bg, light):
+    keys = ("BG", "BORDER", "TRACK", "FG", "DIM", "TRACK_TXT")
+    t = dict(zip(keys, bg))
+    if main:
+        a2 = RAINBOW[(RAINBOW.index(main) + 1) % len(RAINBOW)]
+        t.update(ACCENT=main, ACCENT2=a2, ACCENT_HI=_mix(main, "#ffffff", 0.18), BTN_TXT=_btn_txt(main),
+                 BTN_BG=main, BTN_HI=_mix(main, "#ffffff", 0.18))
+    else:  # радуга: дуги — градиент по всей шкале, кнопка — градиент
+        t.update(ACCENT="#2F7BF6", ACCENT2="#9D4EDD", ACCENT_HI="#5a96f8", BTN_TXT="#111114",
+                 BTN_BG=_grad_css(), BTN_HI=_grad_css(0.18), GRADIENT=True)
+    # цвет подписей ↓ЗАГРУЗКА / ↑ОТДАЧА: на светлом фоне яркие цвета (жёлтый) затемняем для читаемости
+    t.update(TXT1=t["ACCENT"], TXT2=t["ACCENT2"])
+    if light:
+        t.update(TXT1=_mix(t["ACCENT"], "#000000", 0.28), TXT2=_mix(t["ACCENT2"], "#000000", 0.28))
+    t["NAME"] = f"{name} — {race}" + (" · светлая" if light else "")
+    return t
+
+
+THEMES = {}
+for _k, _n, _r, _m, _d, _l in _PALETTE:
+    THEMES[_k] = _make_theme(_k, _n, _r, _m, _d, False)
+for _k, _n, _r, _m, _d, _l in _PALETTE:
+    THEMES[_k + "_light"] = _make_theme(_k, _n, _r, _m, _l, True)
+DARK_KEYS = [p[0] for p in _PALETTE]
+LIGHT_KEYS = [k + "_light" for k in DARK_KEYS]
+DEFAULT_THEME = "wind"   # зелёная, как на сайте
+THEME = DEFAULT_THEME
+
+
+def apply_theme(key):
+    """Делает тему текущей: цвета — глобальные константы, которые читает весь интерфейс."""
+    global THEME
+    THEME = key if key in THEMES else DEFAULT_THEME
+    globals()["GRADIENT"] = False
+    globals().update({k: v for k, v in THEMES[THEME].items() if k != "NAME"})
+
+
+apply_theme(DEFAULT_THEME)
 FONT = "Segoe UI"
 
 
-VERSION = "1.2.0"
+VERSION = "1.3.0"
 UPDATE_REPO = "kolobas58/speedtest"   # GitHub owner/repo с релизами
 # Ed25519 публичный ключ: обновление ставится, только если latest.json подписан парным приватным ключом
 UPDATE_PUBKEY = "0696ac4d041b14d1a288ae43fb9201ead6d69e77be48fd0d196c473f6bafbc4e"
@@ -699,7 +779,7 @@ class Gauge(QWidget):
         self.target = 0.0
         self.shown = 0.0
         self.label = ""
-        self.color = ACCENT
+        self.role = "ACCENT"  # какой цвет темы у дуги: ACCENT (загрузка) / ACCENT2 (отдача)
         self.results = None  # (down, up)
         self.searching = None  # (проверено, всего) во время поиска сервера
         self.spin = 0.0
@@ -713,11 +793,11 @@ class Gauge(QWidget):
         self.searching = (checked, total)
         self.update()
 
-    def set_live(self, label, color):
+    def set_live(self, label, role):
         self.results = None
         self.searching = None
         self.label = label
-        self.color = color
+        self.role = role
         self.update()
 
     def set_target(self, v):
@@ -750,6 +830,23 @@ class Gauge(QWidget):
         self.update()
 
     @staticmethod
+    def _arc_pen(pen, rect, color):
+        """Перо для дуги: обычный цвет или (тема «Радуга») градиент красный → фиолетовый по шкале."""
+        if not GRADIENT:
+            pen.setColor(QColor(color))
+            return pen
+        # QConicalGradient идёт против часовой от угла 315° (низ справа) — там фиолетовый,
+        # к 225° (низ слева, начало шкалы) — красный
+        g = QConicalGradient(rect.center(), 315)
+        n = len(RAINBOW) - 1
+        for i, c in enumerate(reversed(RAINBOW)):
+            g.setColorAt(0.75 * i / n, QColor(c))
+        g.setColorAt(0.87, QColor(RAINBOW[0]))
+        g.setColorAt(1.0, QColor(RAINBOW[-1]))
+        pen.setBrush(QBrush(g))
+        return pen
+
+    @staticmethod
     def _frac(v):
         return min(1.0, math.log10(1 + max(v, 0)) / math.log10(1 + GAUGE_MAX))
 
@@ -773,7 +870,7 @@ class Gauge(QWidget):
 
         frac = self._frac(self.shown)
         if frac > 0.002:
-            pen.setColor(QColor(self.color))
+            self._arc_pen(pen, rect, globals()[self.role])
             p.setPen(pen)
             p.drawArc(rect, 225 * 16, int(-270 * 16 * frac))
 
@@ -791,7 +888,7 @@ class Gauge(QWidget):
         # бегущий сегмент по дуге шкалы
         seg = 60
         start = 225 - min(self.spin, 270 - seg)
-        pen.setColor(QColor(ACCENT))
+        self._arc_pen(pen, rect, ACCENT)
         p.setPen(pen)
         p.drawArc(rect, int(start * 16), int(-seg * 16))
         checked, total = self.searching
@@ -817,7 +914,7 @@ class Gauge(QWidget):
                 p.drawArc(r, 225 * 16, -270 * 16)
             frac = self._frac(v)
             if frac > 0.002:
-                pen.setColor(QColor(col))
+                self._arc_pen(pen, r, col)
                 pen.setWidth(14 if not inset else 8)
                 p.setPen(pen)
                 p.drawArc(r, 225 * 16, int(-270 * 16 * frac))
@@ -825,7 +922,7 @@ class Gauge(QWidget):
         cx = rect.center().x()
         cy = rect.center().y()
         colw = rect.width() * 0.32
-        for i, (title, v, col) in enumerate((("ЗАГРУЗКА", down, ACCENT), ("ОТДАЧА", up, ACCENT2))):
+        for i, (title, v, col) in enumerate((("ЗАГРУЗКА", down, TXT1), ("ОТДАЧА", up, TXT2))):
             x = cx - colw - 8 if i == 0 else cx + 8
             box = QRectF(x, cy - 50, colw, 22)
             p.setPen(QColor(col))
@@ -845,28 +942,116 @@ class Stat(QWidget):
         lay = QVBoxLayout(self)
         lay.setContentsMargins(0, 0, 0, 0)
         lay.setSpacing(2)
-        t = QLabel(title)
-        t.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        t.setStyleSheet(f"color:{DIM}; font-size:12px; letter-spacing:1px;")
+        self.t = QLabel(title)
+        self.t.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.v = QLabel("—")
         self.v.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.v.setStyleSheet(f"color:{FG}; font-size:20px;")
-        lay.addWidget(t)
+        lay.addWidget(self.t)
         lay.addWidget(self.v)
+        self.restyle()
+
+    def restyle(self):
+        self.t.setStyleSheet(f"color:{DIM}; font-size:12px; letter-spacing:1px;")
+        self.v.setStyleSheet(f"color:{FG}; font-size:20px;")
 
     def set(self, text):
         self.v.setText(text)
 
 
 class TitleButton(QPushButton):
-    def __init__(self, text, hover):
+    def __init__(self, text, hover=None):
         super().__init__(text)
+        self.hover = hover  # None — цвет дорожки текущей темы
         self.setFixedSize(30, 26)
         self.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         self.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.restyle()
+
+    def restyle(self):
+        hv = self.hover or TRACK
+        fg = "white" if self.hover else FG
         self.setStyleSheet(
             f"QPushButton{{background:transparent; color:{DIM}; border:none; border-radius:6px; font-size:14px;}}"
-            f"QPushButton:hover{{background:{hover}; color:white;}}")
+            f"QPushButton:hover{{background:{hv}; color:{fg};}}")
+
+
+class Swatch(QWidget):
+    """Кружок темы: фон темы + две половинки акцентов; выбранный — с кольцом."""
+    S = 30
+
+    def __init__(self, key, on_pick):
+        super().__init__()
+        self.key, self.on_pick = key, on_pick
+        self.setFixedSize(self.S, self.S)
+        self.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.setToolTip(THEMES[key]["NAME"])
+        self.hover = False
+
+    def enterEvent(self, e):
+        self.hover = True
+        self.update()
+
+    def leaveEvent(self, e):
+        self.hover = False
+        self.update()
+
+    def mousePressEvent(self, e):
+        if e.button() == Qt.MouseButton.LeftButton:
+            self.on_pick(self.key)
+
+    def paintEvent(self, _):
+        t = THEMES[self.key]
+        p = QPainter(self)
+        p.setRenderHint(QPainter.RenderHint.Antialiasing)
+        r = QRectF(4, 4, self.S - 8, self.S - 8)
+        p.setPen(QPen(QColor(t["BORDER"]), 1))
+        p.setBrush(QColor(t["BG"]))
+        p.drawEllipse(r)
+        inner = r.adjusted(4, 4, -4, -4)
+        p.setPen(Qt.PenStyle.NoPen)
+        if t.get("GRADIENT"):
+            g = QConicalGradient(inner.center(), 90)
+            for i, c in enumerate(RAINBOW + RAINBOW[:1]):
+                g.setColorAt(i / len(RAINBOW), QColor(c))
+            p.setBrush(QBrush(g))
+            p.drawEllipse(inner)
+        else:
+            p.setBrush(QColor(t["ACCENT"]))
+            p.drawPie(inner, 90 * 16, 180 * 16)
+            p.setBrush(QColor(t["ACCENT2"]))
+            p.drawPie(inner, 270 * 16, 180 * 16)
+        if self.key == THEME or self.hover:
+            p.setBrush(Qt.BrushStyle.NoBrush)
+            p.setPen(QPen(QColor(FG if self.key == THEME else DIM), 1.6))
+            p.drawEllipse(QRectF(1, 1, self.S - 2, self.S - 2))
+
+
+class ThemeBar(QWidget):
+    """Всплывающая панель выбора темы под заголовком."""
+
+    def __init__(self, parent, on_pick):
+        super().__init__(parent)
+        lay = QGridLayout(self)
+        lay.setContentsMargins(10, 8, 10, 8)
+        lay.setHorizontalSpacing(2)
+        lay.setVerticalSpacing(2)
+        self.sw = []
+        for row, keys in enumerate((DARK_KEYS, LIGHT_KEYS)):  # сверху тёмные, снизу светлые
+            for col, k in enumerate(keys):
+                w = Swatch(k, on_pick)
+                lay.addWidget(w, row, col)
+                self.sw.append(w)
+        self.adjustSize()
+        self.hide()
+
+    def paintEvent(self, _):
+        p = QPainter(self)
+        p.setRenderHint(QPainter.RenderHint.Antialiasing)
+        path = QPainterPath()
+        path.addRoundedRect(QRectF(self.rect()).adjusted(0.5, 0.5, -0.5, -0.5), 18, 18)
+        p.fillPath(path, QColor(TRACK))
+        p.setPen(QPen(QColor(BORDER), 1))
+        p.drawPath(path)
 
 
 class App(QWidget):
@@ -886,24 +1071,25 @@ class App(QWidget):
         # --- заголовок (перетаскивание + кнопки) ---
         self.title = title = QLabel(self._title_html())
         title.setTextFormat(Qt.TextFormat.RichText)
-        title.setStyleSheet(f"color:{DIM}; font-size:12px; letter-spacing:1px;")
-        b_min = TitleButton("—", TRACK)
-        b_min.clicked.connect(self.showMinimized)
-        b_close = TitleButton("✕", "#d9434f")
-        b_close.clicked.connect(self.close)
+        self.b_theme = TitleButton("◐")
+        self.b_theme.setToolTip("Тема оформления")
+        self.b_theme.clicked.connect(self.toggle_themes)
+        self.b_min = TitleButton("—")
+        self.b_min.clicked.connect(self.showMinimized)
+        self.b_close = TitleButton("✕", "#d9434f")
+        self.b_close.clicked.connect(self.close)
         bar = QHBoxLayout()
         bar.addWidget(title)
         bar.addStretch(1)
-        bar.addWidget(b_min)
-        bar.addWidget(b_close)
+        bar.addWidget(self.b_theme)
+        bar.addWidget(self.b_min)
+        bar.addWidget(self.b_close)
 
         self.gauge = Gauge()
         self.phase = QLabel("Нажмите «Старт»")
         self.phase.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.phase.setStyleSheet(f"color:{DIM}; font-size:13px;")
         self.srv = QLabel(" ")
         self.srv.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.srv.setStyleSheet(f"color:{TRACK_TXT}; font-size:11px;")
 
         self.s_ping, self.s_jit = Stat("ПИНГ, мс"), Stat("ДЖИТТЕР, мс")
         row = QHBoxLayout()
@@ -917,11 +1103,6 @@ class App(QWidget):
         self.btn.setCursor(Qt.CursorShape.PointingHandCursor)
         self.btn.setFixedSize(160, 46)
         self.btn.setFocusPolicy(Qt.FocusPolicy.NoFocus)
-        self.btn.setStyleSheet(
-            f"QPushButton{{background:{ACCENT}; color:white; border:none; border-radius:23px;"
-            f" font-size:14px; font-weight:600; letter-spacing:2px;}}"
-            f"QPushButton:hover{{background:#6a9dff;}}"
-            f"QPushButton:disabled{{background:{TRACK}; color:{DIM};}}")
         self.btn.clicked.connect(self.toggle)
 
         lay = QVBoxLayout(self)
@@ -935,6 +1116,42 @@ class App(QWidget):
         lay.addSpacing(22)
         lay.addWidget(self.btn, alignment=Qt.AlignmentFlag.AlignCenter)
 
+        self.themes = ThemeBar(self, self.set_theme)
+        self.restyle()
+
+    # --- темы ---
+    def restyle(self):
+        self.title.setStyleSheet(f"color:{DIM}; font-size:12px; letter-spacing:1px;")
+        self.title.setText(self._title_html(getattr(self, "_note", "")))
+        self.phase.setStyleSheet(f"color:{DIM}; font-size:13px;")
+        self.srv.setStyleSheet(f"color:{TRACK_TXT}; font-size:11px;")
+        self.btn.setStyleSheet(
+            f"QPushButton{{background:{BTN_BG}; color:{BTN_TXT}; border:none; border-radius:23px;"
+            f" font-size:14px; font-weight:600; letter-spacing:2px;}}"
+            f"QPushButton:hover{{background:{BTN_HI};}}"
+            f"QPushButton:disabled{{background:{TRACK}; color:{DIM};}}")
+        for w in (self.s_ping, self.s_jit, self.b_theme, self.b_min, self.b_close):
+            w.restyle()
+        self.themes.update()
+        self.gauge.update()
+        self.update()
+
+    def set_theme(self, key):
+        apply_theme(key)
+        save_state(theme=THEME)  # запоминаем — следующий запуск откроется в этой теме
+        self.restyle()
+
+    def toggle_themes(self):
+        if self.themes.isVisible():
+            self.themes.hide()
+            return
+        self.themes.adjustSize()
+        x = self.width() - self.themes.width() - 12
+        y = self.b_theme.geometry().bottom() + 8
+        self.themes.move(x, y)
+        self.themes.raise_()
+        self.themes.show()
+
     @staticmethod
     def _title_html(note=""):
         html = f"Speedtest <span style='color:{TRACK_TXT}'>by kolobas58 · v{VERSION}</span>"
@@ -943,7 +1160,8 @@ class App(QWidget):
         return html
 
     def on_updated(self, ver):
-        self.title.setText(self._title_html(f"обновлено до {ver}"))
+        self._note = f"обновлено до {ver}"
+        self.title.setText(self._title_html(self._note))
 
     # --- рамка/фон ---
     def paintEvent(self, _):
@@ -956,6 +1174,8 @@ class App(QWidget):
         p.drawPath(path)
 
     def mousePressEvent(self, e):
+        if self.themes.isVisible():  # клик мимо панели — закрыть её
+            self.themes.hide()
         if e.button() == Qt.MouseButton.LeftButton and self.windowHandle():
             self.windowHandle().startSystemMove()
 
@@ -989,10 +1209,10 @@ class App(QWidget):
         elif name == "Пинг":
             self.gauge.reset()
         elif name == "Загрузка":
-            self.gauge.set_live("↓ Загрузка", ACCENT)
+            self.gauge.set_live("↓ Загрузка", "ACCENT")
         elif name == "Отдача":
             self.gauge.set_target(0)
-            self.gauge.set_live("↑ Отдача", ACCENT2)
+            self.gauge.set_live("↑ Отдача", "ACCENT2")
 
     def on_result(self, key, v):
         self.res[key] = v
@@ -1062,6 +1282,7 @@ if __name__ == "__main__":
     ico = os.path.join(HERE, "speedtest.ico")
     if os.path.exists(ico):
         app.setWindowIcon(QIcon(ico))
+    apply_theme(load_state().get("theme", DEFAULT_THEME))
     w = App()
     w.show()
     QTimer.singleShot(350, w.toggle)  # замер стартует сразу при открытии
