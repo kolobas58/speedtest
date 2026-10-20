@@ -1,7 +1,10 @@
 ; Speedtest by kolobas58 — портативный стартер: один exe без установки.
 ; Первый запуск распаковывает рантайм в %LOCALAPPDATA%\Speedtest\app-<версия> (~2 c),
 ; следующие — запускают сразу. Старые версии удаляются автоматически.
+; 2.x: Windows 10/11 — Flutter-версия (app\speedtest.exe), Windows 7/8 — прежняя на Python/Qt5 (legacy\).
 Unicode true
+!include "LogicLib.nsh"
+!include "WinVer.nsh"
 
 !ifndef VER
   !error "makensis -DVER=x.y.z -DPAYLOAD=dir -DOUT=file -DICON=file portable.nsi"
@@ -51,6 +54,11 @@ Section
   FindClose $1
 
   launch:
-  SetOutPath "$DIR"
-  Exec '"$DIR\python\pythonw.exe" -E -s "$DIR\speedtest.pyw" --exe "$EXEPATH"'
+  ${If} ${AtLeastWin10}
+    SetOutPath "$DIR\app"
+    Exec '"$DIR\app\speedtest.exe" --exe "$EXEPATH"'
+  ${Else}
+    SetOutPath "$DIR\legacy"
+    Exec '"$DIR\legacy\python\pythonw.exe" -E -s "$DIR\legacy\speedtest.pyw" --exe "$EXEPATH"'
+  ${EndIf}
 SectionEnd

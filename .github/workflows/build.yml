@@ -1,0 +1,208 @@
+name: build
+
+# Speedtest 2.x (Flutter): Windows · Linux · Android.
+# Каждый push — сборка и проверки. Выпуск: push в main с новой версией в app/pubspec.yaml (релиза vX.Y.Z ещё нет) —
+# workflow подпишет манифесты обновления и опубликует релиз; все копии обновятся сами.
+on:
+  push:
+  workflow_dispatch:
+
+env:
+  FLUTTER_VERSION: '3.24.5'
+
+jobs:
+  meta:
+    runs-on: ubuntu-latest
+    outputs:
+      ver: ${{ steps.v.outputs.ver }}
+      release: ${{ steps.v.outputs.release }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: v
+        env: { GH_TOKEN: '${{ github.token }}' }
+        run: |
+          V=$(sed -n 's/^version: *\([0-9.]*\).*/\1/p' app/pubspec.yaml)
+          echo "ver=$V" >> "$GITHUB_OUTPUT"
+          R=0
+          if [ "$GITHUB_REF" = refs/heads/main ] && ! gh release view "v$V" -R "$GITHUB_REPOSITORY" >/dev/null 2>&1; then R=1; fi
+          echo "release=$R" >> "$GITHUB_OUTPUT"
+          echo "версия $V, выпуск: $R"
+
+  linux:
+    runs-on: ubuntu-latest
+    permissions: { contents: write }
+    defaults: { run: { working-directory: app } }
+    steps:
+      - uses: actions/checkout@v4
+      - run: sudo apt-get update -qq && sudo apt-get install -y -qq clang cmake ninja-build pkg-config libgtk-3-dev liblzma-dev xvfb imagemagick xdotool >/dev/null
+      - uses: subosito/flutter-action@v2
+        with: { flutter-version: '${{ env.FLUTTER_VERSION }}', channel: stable, cache: true }
+      - run: bash tool/run.sh bash tool/prepare.sh linux
+      - run: bash tool/run.sh flutter test
+      - run: bash tool/run.sh flutter build linux --release
+      - run: |
+          mkdir -p ../dist
+          rm -rf speedtest && cp -r build/linux/x64/release/bundle speedtest && cp assets/icon.png speedtest/icon.png
+          tar -czf ../dist/Speedtest-Linux-x64.tar.gz speedtest
+      - uses: actions/upload-artifact@v4
+        with: { name: linux, path: dist/Speedtest-Linux-x64.tar.gz }
+      - name: Скриншоты и проверка обновления (ветка ci-shots)
+        env: { UPDATE_SIGNING_KEY: '${{ secrets.UPDATE_SIGNING_KEY }}' }
+        run: |
+          P=~/.local/share/club.kolobas58.speedtest
+          mkdir -p shots
+          run() {  # $1 — имя, $2 — настройки, $3 — ждать c, $4 — действие перед снимком
+            rm -rf "$P"; mkdir -p "$P"; echo "$2" > "$P/shared_preferences.json"
+            xvfb-run -a -s "-screen 0 1200x900x24" bash -c "cd speedtest && ./speedtest & sleep $3; ${4:-true}; sleep 1; import -window root shots/$1.png; kill %1" || true
+          }
+          run wind_dark '{}' 45
+          run palette '{"flutter.theme":"water_light"}' 8 "xdotool mousemove 713 205 click 1"
+          run fire_light '{"flutter.theme":"fire_light"}' 45
+          run rainbow '{"flutter.theme":"rainbow"}' 45
+          # обновление: локальный «релиз» 9.9.9 с меткой-файлом, подписанный тем же ключом
+          if [ -n "$UPDATE_SIGNING_KEY" ]; then
+            python3 -m pip install -q cryptography
+            mkdir -p /tmp/rel && cp -r speedtest /tmp/rel/ && echo ok > /tmp/rel/speedtest/UPDATED_MARK
+            (cd /tmp/rel && tar -czf Speedtest-Linux-x64.tar.gz speedtest && rm -rf speedtest)
+            python3 ../tools/sign_release.py /tmp/rel/Speedtest-Linux-x64.tar.gz 9.9.9 > /tmp/rel/latest-linux.json
+            (cd /tmp/rel && python3 -m http.server 8765 >/dev/null 2>&1 &)
+            rm -rf /tmp/upd && cp -r speedtest /tmp/upd
+            rm -rf "$P"; mkdir -p "$P"; echo '{}' > "$P/shared_preferences.json"
+            xvfb-run -a -s "-screen 0 1200x900x24" bash -c "cd /tmp/upd && SPEEDTEST_UPDATE_BASE=http://127.0.0.1:8765/ ./speedtest & sleep 60; import -window root shots/update.png; xdotool mousemove 773 205 click 1; sleep 6" || true
+            M=$([ -f /tmp/upd/UPDATED_MARK ] && echo "файлы подменены" || echo "НЕ подменены")
+            echo "::notice title=update-linux::$M | $(tr '\n' ' ' < /tmp/speedtest_update.log 2>/dev/null | tail -c 900)"
+          fi
+          cd shots && git init -q && git checkout -q -b ci-shots && git add . \
+            && git -c user.name=ci -c user.email=ci@users.noreply.github.com commit -qm "shots ${{ github.sha }}" \
+            && git push -qf "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}" ci-shots
+
+  android:
+    runs-on: ubuntu-latest
+    defaults: { run: { working-directory: app } }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with: { distribution: temurin, java-version: '17' }
+      - uses: subosito/flutter-action@v2
+        with: { flutter-version: '${{ env.FLUTTER_VERSION }}', channel: stable, cache: true }
+      - run: bash tool/run.sh bash tool/prepare.sh android
+      - name: Постоянный ключ подписи (иначе обновления не встанут поверх старой версии)
+        env: { KS: '${{ secrets.ANDROID_KEYSTORE_B64 }}' }
+        run: |
+          if [ -n "$KS" ]; then mkdir -p ~/.android && echo "$KS" | base64 -d > ~/.android/debug.keystore; echo "ключ подписи подключён"; else echo "::warning::нет секрета ANDROID_KEYSTORE_B64 — APK подписан случайным ключом"; fi
+      - run: bash tool/run.sh flutter build apk --release
+      - run: mkdir -p ../dist && cp build/app/outputs/flutter-apk/app-release.apk ../dist/Speedtest-Android.apk
+      - uses: actions/upload-artifact@v4
+        with: { name: android, path: dist/Speedtest-Android.apk }
+
+  windows:
+    runs-on: windows-2022
+    defaults: { run: { working-directory: app } }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with: { flutter-version: '${{ env.FLUTTER_VERSION }}', channel: stable, cache: true }
+      - run: bash tool/run.sh bash tool/prepare.sh windows
+        shell: bash
+      - run: bash tool/run.sh flutter build windows --release
+        shell: bash
+      - name: Рантайм Visual C++ рядом с программой (на чистой Windows его может не быть)
+        shell: pwsh
+        run: |
+          foreach ($d in 'msvcp140.dll','vcruntime140.dll','vcruntime140_1.dll') { Copy-Item "$env:WINDIR\System32\$d" build/windows/x64/runner/Release/ }
+      - uses: actions/upload-artifact@v4
+        with: { name: winbundle, path: app/build/windows/x64/runner/Release }
+
+  package:
+    needs: windows
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with: { name: winbundle, path: winbundle }
+      - run: sudo apt-get update -qq && sudo apt-get install -y -qq nsis unzip >/dev/null
+      - run: bash app/tool/run.sh ./build/package.sh winbundle
+      - uses: actions/upload-artifact@v4
+        with: { name: windows, path: dist/* }
+
+  wintest:
+    needs: package
+    runs-on: windows-2022
+    permissions: { contents: write }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with: { name: windows, path: dist }
+      - name: Запуск, снимок экрана и проверка обновления (локальный «релиз» 9.9.9)
+        shell: pwsh
+        env: { UPDATE_SIGNING_KEY: '${{ secrets.UPDATE_SIGNING_KEY }}' }
+        run: |
+          New-Item -ItemType Directory -Force C:\t, C:\rel, shots | Out-Null
+          Copy-Item dist\Speedtest-Portable.exe C:\t\Speedtest.exe
+          $signed = $false
+          if ($env:UPDATE_SIGNING_KEY) {
+            python -m pip install -q cryptography
+            Copy-Item dist\Speedtest-Portable.exe C:\rel\Speedtest-Portable.exe
+            python tools\sign_release.py C:\rel\Speedtest-Portable.exe 9.9.9 | Out-File -Encoding ascii C:\rel\latest.json
+            Start-Process python -ArgumentList '-m','http.server','8765','-d','C:\rel' -WindowStyle Hidden
+            $env:SPEEDTEST_UPDATE_BASE = 'http://127.0.0.1:8765/'
+            $signed = $true
+          }
+          $before = (Get-Item C:\t\Speedtest.exe).LastWriteTimeUtc
+          Start-Process C:\t\Speedtest.exe
+          Start-Sleep 60
+          Add-Type -AssemblyName System.Windows.Forms, System.Drawing
+          $b = [System.Windows.Forms.Screen]::PrimaryScreen.Bounds
+          $bmp = New-Object System.Drawing.Bitmap $b.Width, $b.Height
+          [System.Drawing.Graphics]::FromImage($bmp).CopyFromScreen($b.Location, [System.Drawing.Point]::Empty, $b.Size)
+          $bmp.Save("$PWD\shots\windows.png")
+          Start-Sleep 20
+          $after = (Get-Item C:\t\Speedtest.exe).LastWriteTimeUtc
+          $log = (Get-Content "$env:TEMP\speedtest_update.log" -ErrorAction SilentlyContinue) -join ' | '
+          $run = (Get-Process speedtest -ErrorAction SilentlyContinue | Select-Object -First 1).Path
+          Write-Output "::notice title=update-windows::signed=$signed exe $before -> $after | process $run | $log"
+      - name: Снимок — в ветку ci-shots-win
+        shell: bash
+        run: |
+          cd shots && git init -q && git checkout -q -b ci-shots-win && git add . \
+            && git -c user.name=ci -c user.email=ci@users.noreply.github.com commit -qm "win ${{ github.sha }}" \
+            && git push -qf "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}" ci-shots-win
+
+  release:
+    needs: [meta, linux, android, package]
+    if: needs.meta.outputs.release == '1'
+    runs-on: ubuntu-latest
+    permissions: { contents: write }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with: { name: linux, path: dist }
+      - uses: actions/download-artifact@v4
+        with: { name: android, path: dist }
+      - uses: actions/download-artifact@v4
+        with: { name: windows, path: dist }
+      - name: Подпись манифестов обновления
+        env: { UPDATE_SIGNING_KEY: '${{ secrets.UPDATE_SIGNING_KEY }}' }
+        run: |
+          [ -n "$UPDATE_SIGNING_KEY" ] || { echo "нет секрета UPDATE_SIGNING_KEY"; exit 1; }
+          python3 -m pip install -q cryptography
+          V=${{ needs.meta.outputs.ver }}
+          python3 tools/sign_release.py dist/Speedtest-Portable.exe "$V" > dist/latest.json
+          python3 tools/sign_release.py dist/Speedtest-Linux-x64.tar.gz "$V" > dist/latest-linux.json
+          python3 tools/sign_release.py dist/Speedtest-Android.apk "$V" > dist/latest-android.json
+          python3 - <<'PY'
+          import json
+          pub = "0696ac4d041b14d1a288ae43fb9201ead6d69e77be48fd0d196c473f6bafbc4e"
+          for f in ("latest.json", "latest-linux.json", "latest-android.json"):
+              assert json.load(open("dist/" + f))["pub"] == pub, "ключ подписи не совпадает с ключом в программе"
+          PY
+      - name: Публикация
+        env: { GH_TOKEN: '${{ github.token }}' }
+        run: |
+          T=v${{ needs.meta.outputs.ver }}
+          gh release create "$T" dist/* --target "$GITHUB_SHA" --title "Speedtest $T" --notes-file - <<'MD'
+          **Speedtest by kolobas58** — замер скорости интернета. Все версии обновляются сами.
+          - **Windows:** `Speedtest-Portable.exe` — без установки, `Speedtest-Setup.exe` — с ярлыками. Windows 10/11 (на 7/8 запускается прежняя версия).
+          - **Linux:** `Speedtest-Linux-x64.tar.gz` — распаковать, запустить `speedtest/speedtest`.
+          - **Android:** `Speedtest-Android.apk` — установить (разрешить установку из этого источника).
+          MD

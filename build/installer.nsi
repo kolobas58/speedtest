@@ -35,7 +35,7 @@ VIAddVersionKey "OriginalFilename" "Speedtest-Setup.exe"
 
 !macro StopApp
   ; закрыть запущенный Speedtest (его рантайм живёт в %LOCALAPPDATA%\Speedtest)
-  nsExec::Exec 'powershell -NoProfile -ExecutionPolicy Bypass -Command "Get-Process pythonw -ErrorAction SilentlyContinue | Where-Object { $$_.Path -like \"$LOCALAPPDATA\Speedtest\*\" } | Stop-Process -Force"'
+  nsExec::Exec 'powershell -NoProfile -ExecutionPolicy Bypass -Command "Get-Process pythonw,speedtest -ErrorAction SilentlyContinue | Where-Object { $$_.Path -like \"$LOCALAPPDATA\Speedtest\*\" } | Stop-Process -Force"'
   Pop $0
 !macroend
 
@@ -60,7 +60,7 @@ Section "Install"
   WriteRegStr   HKCU "${UNKEY}" "QuietUninstallString" '"$INSTDIR\uninstall.exe" /S'
   WriteRegDWORD HKCU "${UNKEY}" "NoModify" 1
   WriteRegDWORD HKCU "${UNKEY}" "NoRepair" 1
-  WriteRegDWORD HKCU "${UNKEY}" "EstimatedSize" 46000
+  WriteRegDWORD HKCU "${UNKEY}" "EstimatedSize" 90000
 SectionEnd
 
 Section "Uninstall"
