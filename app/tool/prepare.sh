@@ -4,6 +4,7 @@
 set -euo pipefail
 P="$1"
 flutter create --org club.kolobas58 --project-name speedtest --platforms="$P" .
+rm -f test/widget_test.dart   # шаблонный тест счётчика из flutter create
 case "$P" in
   android)
     M=android/app/src/main/AndroidManifest.xml

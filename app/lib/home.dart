@@ -294,7 +294,7 @@ class _HomeState extends State<Home> with WindowListener, WidgetsBindingObserver
           child: Text.rich(
             TextSpan(children: [
               TextSpan(text: 'Speedtest ', style: _st(12, t.dim, ls: 1)),
-              TextSpan(text: 'by kolobas58 · v$version', style: _st(12, t.trackTxt, ls: 1)),
+              TextSpan(text: note == null ? 'by kolobas58 · v$version' : 'v$version', style: _st(12, t.trackTxt, ls: 1)),
               if (note != null) TextSpan(text: ' · $note', style: _st(12, const Color(0xFF3FB27F), ls: .5)),
             ]),
             maxLines: 1,
