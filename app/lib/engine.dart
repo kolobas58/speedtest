@@ -9,7 +9,7 @@ import 'dart:typed_data';
 
 import 'store.dart';
 
-const version = '2.0.0';
+const version = '2.0.1';
 const ua = 'Mozilla/5.0 Speedtest-kolobas58/$version';
 const streams = 4;
 const duration = 10.0; // с на фазу (после последнего переключения сервера)
