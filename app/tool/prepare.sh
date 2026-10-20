@@ -23,6 +23,27 @@ case "$P" in
     <cache-path name="cache" path="."/>
 </paths>
 X
+    # подпись релиза постоянным ключом (~/.android/release.keystore кладёт CI из секрета ANDROID_KEYSTORE_B64)
+    A=android/app/build.gradle
+    if [ -f "$A" ] && ! grep -q 'signingConfigs.release' "$A"; then
+      python3 - "$A" <<'PY'
+import sys, re
+p = sys.argv[1]; s = open(p).read()
+cfg = """    signingConfigs {
+        release {
+            storeFile file("${System.getProperty('user.home')}/.android/release.keystore")
+            storePassword "android"
+            keyAlias "androiddebugkey"
+            keyPassword "android"
+        }
+    }
+
+    buildTypes {"""
+s = s.replace("    buildTypes {", cfg, 1)
+s = re.sub(r"signingConfig\s*=?\s*signingConfigs\.debug", "signingConfig = signingConfigs.release", s)
+open(p, "w").write(s)
+PY
+    fi
     # старые плагины (ota_update) собираются с compileSdk 28 → «android:attr/lStar not found»; поднимаем всем библиотекам
     G=android/build.gradle
     if [ -f "$G" ] && ! grep -q 'compileSdkVersion 34 // libs' "$G"; then

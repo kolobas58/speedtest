@@ -89,8 +89,13 @@ jobs:
       - name: Постоянный ключ подписи (иначе обновления не встанут поверх старой версии)
         env: { KS: '${{ secrets.ANDROID_KEYSTORE_B64 }}' }
         run: |
-          if [ -n "$KS" ]; then mkdir -p ~/.android && echo "$KS" | base64 -d > ~/.android/debug.keystore; echo "ключ подписи подключён"; else echo "::warning::нет секрета ANDROID_KEYSTORE_B64 — APK подписан случайным ключом"; fi
+          if [ -n "$KS" ]; then mkdir -p ~/.android && echo "$KS" | base64 -d > ~/.android/release.keystore; echo "ключ подписи подключён"; else echo "::error::нет секрета ANDROID_KEYSTORE_B64 — без постоянного ключа обновления APK не встанут поверх"; exit 1; fi
       - run: bash tool/run.sh flutter build apk --release
+      - name: Проверка подписи APK
+        run: |
+          O=$(keytool -printcert -jarfile build/app/outputs/flutter-apk/app-release.apk | grep -m1 -E 'Owner|Владелец' || true)
+          echo "::notice title=apk-signer::$O"
+          case "$O" in *kolobas58*) ;; *) echo "::error::APK подписан не нашим ключом: $O"; exit 1;; esac
       - run: mkdir -p ../dist && cp build/app/outputs/flutter-apk/app-release.apk ../dist/Speedtest-Android.apk
       - uses: actions/upload-artifact@v4
         with: { name: android, path: dist/Speedtest-Android.apk }
