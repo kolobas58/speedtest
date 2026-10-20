@@ -1,34 +1,26 @@
 # Speedtest by kolobas58
 
-Минималистичный замер скорости интернета для Windows 7 SP1 – 11 (x64).
-Один файл `Speedtest-Portable.exe`: скачал → запустил → через пару секунд идёт замер. Установка не нужна.
+Минималистичный замер скорости интернета — **Windows · Linux · Android**. Все версии обновляются сами.
 
-- **[Speedtest-Portable.exe](../../releases/latest/download/Speedtest-Portable.exe)** — без установки: скачал → запустил.
-- **[Speedtest-Setup.exe](../../releases/latest/download/Speedtest-Setup.exe)** — тихая установка без прав администратора:
-  ярлыки на рабочем столе и в «Пуске», запись в «Программах и компонентах». `/S` — тихо, `uninstall.exe /S` — тихое удаление.
-
-Обе версии обновляются автоматически.
+- **[Speedtest-Portable.exe](../../releases/latest/download/Speedtest-Portable.exe)** — Windows без установки: скачал → запустил.
+- **[Speedtest-Setup.exe](../../releases/latest/download/Speedtest-Setup.exe)** — Windows, тихая установка без прав администратора (ярлыки, «Программы и компоненты»).
+- **[Speedtest-Linux-x64.tar.gz](../../releases/latest/download/Speedtest-Linux-x64.tar.gz)** — распаковать, запустить `speedtest/speedtest`.
+- **[Speedtest-Android.apk](../../releases/latest/download/Speedtest-Android.apk)** — Android 5+.
 
 ## Как это работает
-- 14 тем оформления — 7 стихий (Огонь, Земля, Свет, Ветер, Вода, Тьма, Радуга) в тёмном и светлом варианте.
-  Выбор — кнопка ◐ в заголовке, тема запоминается. По умолчанию — Ветер.
+- 14 тем — 7 стихий (Огонь, Земля, Свет, Ветер, Вода, Тьма, Радуга) в тёмном и светлом варианте; кнопка ◐ в заголовке.
 - Параллельно пингует ~40 серверов (LibreSpeed, Cloudflare, Vultr) и за ~0.7 с выбирает ближайший живой;
-  при сбое сервера на лету переключается на следующий.
+  при сбое сервера на лету переключается на следующий. Если первый замер сорвался — повторяет сам.
 - Скачивание и отдача в 4 потока по 10 с, показывается средняя скорость (без скачков).
-- После замера тихо проверяет обновления в GitHub Releases. Новая версия ставится, только если
-  подписана ключом разработчика (Ed25519), и применяется со следующего запуска.
+- После замера тихо проверяет обновления. Ставится только то, что подписано ключом разработчика (Ed25519):
+  `latest.json` (Windows), `latest-linux.json`, `latest-android.json`.
 
-## Выпуск новой версии
-1. Правки в `src/speedtest.pyw`, поднять `VERSION`.
-2. `git commit -am "1.2.1" && git push` — релиз и тег GitHub Actions создаст сам.
-3. GitHub Actions соберёт и опубликует релиз, пользователи обновятся сами.
+## Устройство
+- `app/` — Flutter 3.24 (Windows 10/11, Linux, Android). Платформенные папки генерирует `app/tool/prepare.sh`.
+- `src/speedtest.pyw` — прежняя версия на Python/Qt5: её кладём внутрь Windows-сборки для Windows 7/8, где Flutter не работает.
+  Стартер `build/portable.nsi` сам выбирает, что запустить.
+- `.github/workflows/build.yml` — сборка, снимки экрана и проверка обновления на каждый push; выпуск — push в `main`
+  с новой версией в `app/pubspec.yaml`.
 
-Секрет репозитория `UPDATE_SIGNING_KEY` — приватный ключ подписи (hex). Хранить только в секретах
-GitHub и в надёжном месте у себя: без него выпускать обновления нельзя, при утечке — сменить пару
-ключей (`python tools/sign_release.py --keygen`) и выпустить версию с новым `UPDATE_PUBKEY`.
-
-## Локальная сборка (Linux / WSL)
-```
-sudo apt install nsis unzip && pip install cryptography
-./build/build.sh      # dist/Speedtest-Portable.exe и dist/Speedtest-Setup.exe
-```
+Секреты: `UPDATE_SIGNING_KEY` — приватный ключ подписи обновлений (hex), `ANDROID_KEYSTORE_B64` — ключ подписи APK.
+Хранить у себя: без них выпускать обновления нельзя.
