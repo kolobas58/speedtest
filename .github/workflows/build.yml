@@ -143,12 +143,12 @@ jobs:
         env: { UPDATE_SIGNING_KEY: '${{ secrets.UPDATE_SIGNING_KEY }}' }
         run: |
           New-Item -ItemType Directory -Force C:\t, C:\rel, shots | Out-Null
-          Copy-Item dist\Speedtest-Portable.exe C:\t\Speedtest.exe
+          Copy-Item dist\Speedtest-Windows-x64.exe C:\t\Speedtest.exe
           $signed = $false
           if ($env:UPDATE_SIGNING_KEY) {
             python -m pip install -q cryptography
-            Copy-Item dist\Speedtest-Portable.exe C:\rel\Speedtest-Portable.exe
-            python tools\sign_release.py C:\rel\Speedtest-Portable.exe 9.9.9 | Out-File -Encoding ascii C:\rel\latest.json
+            Copy-Item dist\Speedtest-Windows-x64.exe C:\rel\Speedtest-Windows-x64.exe
+            python tools\sign_release.py C:\rel\Speedtest-Windows-x64.exe 9.9.9 | Out-File -Encoding ascii C:\rel\latest.json
             Start-Process python -ArgumentList '-m','http.server','8765','-d','C:\rel' -WindowStyle Hidden
             $env:SPEEDTEST_UPDATE_BASE = 'http://127.0.0.1:8765/'
             $signed = $true
@@ -192,7 +192,7 @@ jobs:
           [ -n "$UPDATE_SIGNING_KEY" ] || { echo "нет секрета UPDATE_SIGNING_KEY"; exit 1; }
           python3 -m pip install -q cryptography
           V=${{ needs.meta.outputs.ver }}
-          python3 tools/sign_release.py dist/Speedtest-Portable.exe "$V" > dist/latest.json
+          python3 tools/sign_release.py dist/Speedtest-Windows-x64.exe "$V" > dist/latest.json
           python3 tools/sign_release.py dist/Speedtest-Linux-x64.tar.gz "$V" > dist/latest-linux.json
           python3 tools/sign_release.py dist/Speedtest-Android.apk "$V" > dist/latest-android.json
           python3 - <<'PY'
@@ -207,7 +207,7 @@ jobs:
           T=v${{ needs.meta.outputs.ver }}
           gh release create "$T" dist/* --target "$GITHUB_SHA" --title "Speedtest $T" --notes-file - <<'MD'
           **Speedtest by kolobas58** — замер скорости интернета. Все версии обновляются сами.
-          - **Windows:** `Speedtest-Portable.exe` — без установки, `Speedtest-Setup.exe` — с ярлыками. Windows 10/11 (на 7/8 запускается прежняя версия).
+          - **Windows:** `Speedtest-Windows-x64.exe` — без установки: скачал и запустил.
           - **Linux:** `Speedtest-Linux-x64.tar.gz` — распаковать, запустить `speedtest/speedtest`.
           - **Android:** `Speedtest-Android.apk` — установить (разрешить установку из этого источника).
           MD

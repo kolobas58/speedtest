@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Speedtest 2.x для Windows: Speedtest-Portable.exe и Speedtest-Setup.exe.
+# Speedtest для Windows: один файл Speedtest-Windows-x64.exe, без установки.
 # Внутри два рантайма: Flutter-версия (Windows 10/11) и прежняя версия на Python/Qt5 (Windows 7/8 — Flutter там не работает).
 # Стартер сам выбирает, что запустить. Обе версии обновляются одним и тем же подписанным latest.json.
 # Запуск: build/package.sh <папка flutter build windows (Release)>   Нужны: python3+pip, nsis, unzip.
@@ -45,7 +45,5 @@ cp "$ROOT/src/speedtest.ico" "$L/"
 # --- Flutter-версия ---
 cp -r "$FL" "$P/app"
 
-makensis -V2 -DVER="$VER" -DPAYLOAD="$P" -DOUT="$OUT/Speedtest-Portable.exe" -DICON="$ROOT/src/speedtest.ico" "$ROOT/build/portable.nsi"
-echo ">> $OUT/Speedtest-Portable.exe ($(du -h "$OUT/Speedtest-Portable.exe" | cut -f1))"
-makensis -V2 -DVER="$VER" -DEXE="$OUT/Speedtest-Portable.exe" -DOUT="$OUT/Speedtest-Setup.exe" -DICON="$ROOT/src/speedtest.ico" "$ROOT/build/installer.nsi"
-echo ">> $OUT/Speedtest-Setup.exe ($(du -h "$OUT/Speedtest-Setup.exe" | cut -f1))"
+makensis -V2 -DVER="$VER" -DPAYLOAD="$P" -DOUT="$OUT/Speedtest-Windows-x64.exe" -DICON="$ROOT/src/speedtest.ico" "$ROOT/build/portable.nsi"
+echo ">> $OUT/Speedtest-Windows-x64.exe ($(du -h "$OUT/Speedtest-Windows-x64.exe" | cut -f1))"

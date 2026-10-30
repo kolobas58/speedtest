@@ -27,7 +27,7 @@ VIAddVersionKey "CompanyName"      "kolobas58"
 VIAddVersionKey "LegalCopyright"   "(c) kolobas58"
 VIAddVersionKey "FileVersion"      "${VER}"
 VIAddVersionKey "ProductVersion"   "${VER}"
-VIAddVersionKey "OriginalFilename" "Speedtest-Portable.exe"
+VIAddVersionKey "OriginalFilename" "Speedtest-Windows-x64.exe"
 
 Var DIR
 
